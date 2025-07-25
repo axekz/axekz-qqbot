@@ -263,7 +263,39 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep):
                     elif pk_session.bet_coins == -1:
                         delta_distance = abs(float(data1["distance"]) - float(data2["distance"]))
                         total_speed_loser = float(data2["max_val"]) + float(data2["pre"])
-                        taunt = random.choice([...])  # 省略 taunt_messages，保留原本内容
+                        taunt_messages = [
+                            # 轻度调侃（数据对比）
+                            f"你的同步率{data2['sync']}%是在致敬人类极限吗？我奶奶的缝纫机都比这同步！",
+                            f"空速{data2['max_val']}？建议把键盘泡水里试试，说不定水流能帮你加速",
+                            f"{winner.nickname}的地速{data1['pre']} vs 你的{data2['pre']}，这差距够我泡碗面了",
+                            f"距离差{delta_distance:.1f}单位？刚好是你和人类平均反应速度的差距",
+
+                            # 中度嘲讽（技术羞辱）
+                            "刚才那波操作是闭眼打的？建议改名叫'帕金森流跳远'",
+                            f"看你的{data2['strafes']}次摆速，我以为在欣赏慢动作回放",
+                            "失败结算界面是你第二熟悉的画面吧？",
+                            f"你这{data2['sync']}%的同步率去工地搬砖都怕你手脚不协调砸到脚",
+                            "建议把游戏ID改成'禁言VIP会员'",
+
+                            # 数据暴击（精准打击）
+                            f"空速{data2['max_val']}+地速{data2['pre']}={total_speed_loser:.1f}？二进制选手？",
+                            f"距离{data2['distance']}配{data2['strafes']}次摆速，完美诠释无效操作",
+                            f"你{data2['sync']}%的同步率是想证明左右手互为陌生人？",
+
+                            # 重度暴击（物理禁言梗）
+                            "系统都看不过去帮你物理闭麦了",
+                            "这10分钟禁言是给你时间练习用手走路吗？",
+                            "刚才的跳跃数据是你用脚趾操作的吧？建议嘴也参与操作",
+                            f"别挣扎了，你输掉的{pk_session.bet_coins}金币都够买副哑铃练手速了",
+
+                            # 终极羞辱（结合游戏机制）
+                            f"建议把{data2['distance']}的纪录刻在墓志铭上——这里埋葬着反重力战士",
+                            "你掉落的金币在空中划出的弧线比你跳跃轨迹还优美",
+                            f"系统税收的硬币都比你操作更有价值",
+                            "刚检测到你键盘的WASD键正在发起集体罢工",
+                            "失败者特效在你身上是常驻皮肤吧？"
+                        ]
+                        taunt = random.choice(taunt_messages)  # 省略 taunt_messages，保留原本内容
                         await accept_game.send(MessageSegment.at(int(loser.qid)) + " " + taunt)
                         await bot.set_group_ban(group_id=event.group_id, user_id=int(loser.qid), duration=10 * 60)
                     return None
@@ -325,3 +357,4 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep):
                 return await accept_game.send(content, at_sender=True)
 
         return await accept_game.send("未找到该LJPK对局，或已被其他玩家接受，或已超过两分钟")
+    return None
