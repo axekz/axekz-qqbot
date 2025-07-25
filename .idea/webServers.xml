@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="4d720363-3b0e-407e-ad32-fd4a68626042" name="axekz-web">
+        <fileTransfer rootFolder="/home/ubuntu" accessType="SFTP" host="175.178.78.100" port="22" sshConfigId="92a68d9b-0ebe-4c17-a55d-6eb28dd43572" sshConfig="ubuntu@175.178.78.100:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

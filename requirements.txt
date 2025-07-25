@@ -1,0 +1,7 @@
+nonebot-adapter-onebot
+sqlmodel~=0.0.24
+aiohttp~=3.12.14
+steam~=1.4.4
+pydantic~=2.11.7
+SQLAlchemy~=2.0.41
+httpx~=0.28.1
