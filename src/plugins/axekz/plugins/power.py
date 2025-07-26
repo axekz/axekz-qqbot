@@ -12,6 +12,7 @@ admin = on_command('admin')
 group_rename = on_command('group_rename', aliases={'群名'})
 
 ADMIN_COST = 1500
+KICK_COST = 1000
 
 
 @kick.handle()
@@ -31,7 +32,7 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep, args: Messa
     if target_user_info['role'] == 'admin':
         cost = int(ADMIN_COST * 0.8)
     else:
-        cost = 300
+        cost = KICK_COST
 
     if cd.user1.coins < cost:
         return await mute.finish(f'没有足够的斧币，需要: {cost}, 你有 {cd.user1.coins}', at_sender=True)
@@ -94,34 +95,34 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep, args: Messa
     await mute.finish(f'禁言成功，花费 {cost}, 剩余 {cd.user1.coins}', at_sender=True)
 
 
-@group_rename.handle()
-async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    group_name = args.extract_plain_text().strip()
-    await bot.set_group_name(group_id=event.group_id, group_name=group_name)
+# @group_rename.handle()
+# async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
+#     group_name = args.extract_plain_text().strip()
+#     await bot.set_group_name(group_id=event.group_id, group_name=group_name)
 
 
-@admin.handle()
-async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep, args: Message = CommandArg()):
-    bot_info = await bot.get_group_member_info(user_id=int(bot.self_id), group_id=event.group_id, no_cache=True)
-    if bot_info['role'] != 'owner':
-        return await admin.send('机器人在本群不是群主，无法购买管理员')
-
-    cd = CommandData(event, args)
-    if cd.error:
-        return await mute.send(cd.error, at_sender=True)
-
-    # 判定余额是否充足
-    if cd.user1.coins < ADMIN_COST:
-        return await mute.finish(f'没有足够的斧币，需要: {ADMIN_COST}, 你有 {cd.user1.coins}', at_sender=True)
-
-    cd.user1.coins -= ADMIN_COST
-    session.add(cd.user1)
-    session.commit()
-    session.refresh(cd.user1)
-
-    if cd.user2:
-        await bot.set_group_admin(group_id=event.group_id, user_id=int(cd.user2.qid), enable=False)
-        await kick.send(f'卸载 {cd.user2.nickname} {cd.user2.qid} 的管理员成功，花费 {ADMIN_COST}，余额 {cd.user1.coins}', at_sender=True)
-    else:
-        await bot.set_group_admin(group_id=event.group_id, user_id=int(cd.user1.qid), enable=True)
-        await kick.send(f'购买管理员成功，花费 {ADMIN_COST}， 余额 {cd.user1.coins}', at_sender=True)
+# @admin.handle()
+# async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep, args: Message = CommandArg()):
+#     bot_info = await bot.get_group_member_info(user_id=int(bot.self_id), group_id=event.group_id, no_cache=True)
+#     if bot_info['role'] != 'owner':
+#         return await admin.send('机器人在本群不是群主，无法购买管理员')
+#
+#     cd = CommandData(event, args)
+#     if cd.error:
+#         return await mute.send(cd.error, at_sender=True)
+#
+#     # 判定余额是否充足
+#     if cd.user1.coins < ADMIN_COST:
+#         return await mute.finish(f'没有足够的斧币，需要: {ADMIN_COST}, 你有 {cd.user1.coins}', at_sender=True)
+#
+#     cd.user1.coins -= ADMIN_COST
+#     session.add(cd.user1)
+#     session.commit()
+#     session.refresh(cd.user1)
+#
+#     if cd.user2:
+#         await bot.set_group_admin(group_id=event.group_id, user_id=int(cd.user2.qid), enable=False)
+#         await kick.send(f'卸载 {cd.user2.nickname} {cd.user2.qid} 的管理员成功，花费 {ADMIN_COST}，余额 {cd.user1.coins}', at_sender=True)
+#     else:
+#         await bot.set_group_admin(group_id=event.group_id, user_id=int(cd.user1.qid), enable=True)
+#         await kick.send(f'购买管理员成功，花费 {ADMIN_COST}， 余额 {cd.user1.coins}', at_sender=True)

@@ -24,6 +24,9 @@ rename = on_command('rename')
 special_title = on_command('title', aliases={'头衔'})
 transactions = on_command("transactions", aliases={"账单", "账单记录", "硬币记录", "coinlog"})
 
+RENAME_COST = 20
+TITLE_COST = 500
+
 
 @transactions.handle()
 async def _(event: MessageEvent, session: SessionDep, arg: Message = CommandArg()):
@@ -63,48 +66,46 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep, args: Messa
     if not user:
         user = await bind_steamid(event, session)
 
-    price = 20
-    if user.coins < price:
-        return await special_title.send(f"没有足够的硬币，需要 {price}, 你有 {user.coins}")
+    if user.coins < TITLE_COST:
+        return await special_title.send(f"没有足够的硬币，需要 {TITLE_COST}, 你有 {user.coins}")
 
     title = args.extract_plain_text().strip()
     length = 18
     if len(title) > length:
         return await special_title.send(f'头衔过长，不能大于 {length} 个字符')
 
-    user.coins -= price
+    user.coins -= TITLE_COST
     session.add(user)
     session.commit()
     session.refresh(user)
 
     await bot.set_group_special_title(group_id=event.group_id, user_id=event.user_id, special_title=title)
-    await special_title.send(f'头衔 {title} 设置成功, 花费 {price}, 余额 {user.coins}', at_sender=True)
+    return await special_title.send(f'头衔 {title} 设置成功, 花费 {TITLE_COST}, 余额 {user.coins}', at_sender=True)
 
 
 @rename.handle()
 async def _(event: MessageEvent, session: SessionDep, args: Message = CommandArg()):
-    price = 20
     user_id = event.get_user_id()
     user: User | None = session.get(User, user_id)
     if not user:
         user = await bind_steamid(event, session)
-    elif user.coins < price:
-        return await rename.finish(f'您的余额不足\n需要: {price}, 您有: {user.coins}')
+    elif user.coins < RENAME_COST:
+        return await rename.finish(f'您的余额不足\n需要: {RENAME_COST}, 您有: {user.coins}')
 
     name = args.extract_plain_text().strip()
     if not name:
-        return await rename.finish(f'请输入昵称, 改名需花费 {price} 硬币')
+        return await rename.finish(f'请输入昵称, 改名需花费 {RENAME_COST} 硬币')
 
     user.nickname = name
-    user.coins -= price
+    user.coins -= RENAME_COST
 
     bank = get_bank()
-    bank.coins += price
+    bank.coins += RENAME_COST
 
     # 添加交易记录
     transaction = CoinTransaction(
         user_id=user.qid,
-        amount=-price,
+        amount=-RENAME_COST,
         type=TransactionType.PURCHASE,
         description=f"修改昵称为「{name}」"
     )
@@ -119,7 +120,7 @@ async def _(event: MessageEvent, session: SessionDep, args: Message = CommandArg
         logger.error(e)
         return await rename.finish(repr(e))
 
-    return await rename.finish(f'成功修改昵称为: {user.nickname}\n余额: {user.coins} (-{price})')
+    return await rename.finish(f'成功修改昵称为: {user.nickname}\n余额: {user.coins} (-{RENAME_COST})')
 
 
 @info.handle()
