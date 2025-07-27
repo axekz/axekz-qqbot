@@ -8,7 +8,7 @@ from nonebot.plugin import on_command
 from sqlmodel import select
 
 from .general import bind_steamid
-from ..core import get_bank
+from ..core import get_bank, BANK_QID
 from ..core.db.deps import SessionDep
 from ..core.db.models import Sign, CoinTransaction, TransactionType
 from ..core.db.models import User, Allowance
@@ -107,13 +107,17 @@ async def _(event: GroupMessageEvent, session: SessionDep):
 
     # 获取硬币最多的用户（硬币 > 100）
     top_users = session.exec(
-        select(User).where(User.coins > 100).order_by(User.coins.desc()).limit(1)
+        select(User)
+        .where(User.qid != BANK_QID, User.coins >= 100)
+        .order_by(User.coins.desc())
+        .limit(3)
     ).all()
 
     if not top_users:
         return await sign.finish("今天没有资本家可以签到吸血了")
 
-    giver = top_users[0]
+    weights = [3, 2, 1][:len(top_users)]
+    giver = random.choices(top_users, weights=weights, k=1)[0]
 
     # 正态分布获取硬币数（默认 20±5）
     earned_coins = round(random.gauss(20, 5))
@@ -158,84 +162,84 @@ async def _(event: GroupMessageEvent, session: SessionDep):
     )
 
 
-@allowance.handle()
-async def _(event: MessageEvent, session: SessionDep):
-    await allowance.finish('该功能已停用')
-    user_id = event.get_user_id()
-    user: User | None = session.get(User, user_id)
-    if not user:
-        user = await bind_steamid(event, session)
-
-    # Check if the user has 0 coins
-    if user.coins >= 10:
-        return await allowance.finish("只有余额小于10的用户可以领取低保")
-
-    # Check if the user has signed today
-    today = datetime.now().date()
-    sign_in_today = session.exec(
-        select(Sign).where(
-            Sign.qid == user_id,
-            Sign.signed_at >= today,
-            Sign.signed_at < today + timedelta(days=1)
-        )
-    ).first()
-    if not sign_in_today:
-        return await allowance.finish(f"今天你还未签到, 请签到后再尝试领取\n余额: {user.coins}")
-
-    # Check if the user has already received allowance 3 times today
-    allowance_count_today = session.exec(
-        select(Allowance).where(
-            Allowance.receiver_qid == user_id,
-            Allowance.date >= today,
-            Allowance.date < today + timedelta(days=1)
-        )
-    ).all()
-
-    if len(allowance_count_today) >= 3:
-        return await allowance.finish("今天已经领取了3次低保，无法再领取")
-
-    # Get the top 3 users with the most coins (with coins > 100)
-    top_users = session.exec(
-        select(User)
-        .where(User.qid != BANK_QID, User.coins >= 100)
-        .order_by(User.coins.desc())
-        .limit(3)
-    ).all()
-
-    if not top_users:
-        return await allowance.finish("没有资本家可以抢劫了")
-
-    # Randomly choose one user as the giver
-    giver = random.choice(top_users)
-
-    # 5% possibility that earned coins will be 5% of giver's coins
-    # if random.random() <= 0.05:
-    #     earned_coins = round(0.05 * giver.coins)
-    # else:
-    # Give random coins based on normal distribution
-    earned_coins = round(random.gauss(20, 5))
-    earned_coins = 1 if earned_coins < 1 else earned_coins
-
-    # Update the giver and receiver's coins
-    giver.coins -= earned_coins
-    user.coins += earned_coins
-
-    # Store the transaction in the Allowance table
-    new_allowance = Allowance(
-        giver_qid=giver.qid,
-        receiver_qid=user.qid,
-        amount=earned_coins,
-        date=datetime.now()
-    )
-
-    session.add(new_allowance)
-    session.add(giver)
-    session.add(user)
-    session.commit()
-    session.refresh(giver)
-    session.refresh(user)
-
-    await allowance.send(f'低保领取成功, 获得 {earned_coins} 硬币\n当前余额：{user.coins} 今天还可以领取 {len(allowance_count_today) + 1}/3 次\n来自用户: {giver.nickname} {giver.coins} (-{earned_coins})')
+# @allowance.handle()
+# async def _(event: MessageEvent, session: SessionDep):
+#     await allowance.finish('该功能已停用')
+#     user_id = event.get_user_id()
+#     user: User | None = session.get(User, user_id)
+#     if not user:
+#         user = await bind_steamid(event, session)
+#
+#     # Check if the user has 0 coins
+#     if user.coins >= 10:
+#         return await allowance.finish("只有余额小于10的用户可以领取低保")
+#
+#     # Check if the user has signed today
+#     today = datetime.now().date()
+#     sign_in_today = session.exec(
+#         select(Sign).where(
+#             Sign.qid == user_id,
+#             Sign.signed_at >= today,
+#             Sign.signed_at < today + timedelta(days=1)
+#         )
+#     ).first()
+#     if not sign_in_today:
+#         return await allowance.finish(f"今天你还未签到, 请签到后再尝试领取\n余额: {user.coins}")
+#
+#     # Check if the user has already received allowance 3 times today
+#     allowance_count_today = session.exec(
+#         select(Allowance).where(
+#             Allowance.receiver_qid == user_id,
+#             Allowance.date >= today,
+#             Allowance.date < today + timedelta(days=1)
+#         )
+#     ).all()
+#
+#     if len(allowance_count_today) >= 3:
+#         return await allowance.finish("今天已经领取了3次低保，无法再领取")
+#
+#     # Get the top 3 users with the most coins (with coins > 100)
+#     top_users = session.exec(
+#         select(User)
+#         .where(User.qid != BANK_QID, User.coins >= 100)
+#         .order_by(User.coins.desc())
+#         .limit(3)
+#     ).all()
+#     print(top_users)
+#     if not top_users:
+#         return await allowance.finish("没有资本家可以抢劫了")
+#
+#     # Randomly choose one user as the giver
+#     giver = random.choice(top_users)
+#
+#     # 5% possibility that earned coins will be 5% of giver's coins
+#     # if random.random() <= 0.05:
+#     #     earned_coins = round(0.05 * giver.coins)
+#     # else:
+#     # Give random coins based on normal distribution
+#     earned_coins = round(random.gauss(20, 5))
+#     earned_coins = 1 if earned_coins < 1 else earned_coins
+#
+#     # Update the giver and receiver's coins
+#     giver.coins -= earned_coins
+#     user.coins += earned_coins
+#
+#     # Store the transaction in the Allowance table
+#     new_allowance = Allowance(
+#         giver_qid=giver.qid,
+#         receiver_qid=user.qid,
+#         amount=earned_coins,
+#         date=datetime.now()
+#     )
+#
+#     session.add(new_allowance)
+#     session.add(giver)
+#     session.add(user)
+#     session.commit()
+#     session.refresh(giver)
+#     session.refresh(user)
+#
+#     await allowance.send(f'低保领取成功, 获得 {earned_coins} 硬币\n当前余额：{user.coins} 今天还可以领取 {len(allowance_count_today) + 1}/3 次\n来自用户: {giver.nickname} {giver.coins} (-{earned_coins})')
 
     
 # @daily_task.handle()
