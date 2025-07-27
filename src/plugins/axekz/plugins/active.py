@@ -199,7 +199,7 @@ async def _(event: MessageEvent, session: SessionDep):
         select(User)
         .where(User.qid != BANK_QID, User.coins >= 100)
         .order_by(User.coins.desc())
-        .limit(1)
+        .limit(3)
     ).all()
 
     if not top_users:
