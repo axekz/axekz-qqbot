@@ -25,7 +25,7 @@ special_title = on_command('title', aliases={'头衔'})
 transactions = on_command("transactions", aliases={"账单", "账单记录", "硬币记录", "coinlog"})
 
 RENAME_COST = 20
-TITLE_COST = 500
+TITLE_COST = 100
 
 
 @transactions.handle()
@@ -75,9 +75,29 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep, args: Messa
         return await special_title.send(f'头衔过长，不能大于 {length} 个字符')
 
     user.coins -= TITLE_COST
-    session.add(user)
-    session.commit()
-    session.refresh(user)
+
+    # 给银行转账
+    bank = get_bank()
+    bank.coins += TITLE_COST
+
+    # 添加交易记录
+    transaction = CoinTransaction(
+        user_id=user.qid,
+        amount=-TITLE_COST,
+        type=TransactionType.PURCHASE,
+        description=f"设置头衔为「{title}」"
+    )
+
+    session.add_all([user, bank, transaction])
+
+    try:
+        session.commit()
+        session.refresh(user)
+        session.refresh(bank)
+    except Exception as e:
+        session.rollback()
+        logger.error(e)
+        return await special_title.finish(repr(e))
 
     await bot.set_group_special_title(group_id=event.group_id, user_id=event.user_id, special_title=title)
     return await special_title.send(f'头衔 {title} 设置成功, 花费 {TITLE_COST}, 余额 {user.coins}', at_sender=True)

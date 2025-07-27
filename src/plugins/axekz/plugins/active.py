@@ -1,3 +1,4 @@
+import math
 import random
 from datetime import datetime, timedelta
 
@@ -7,6 +8,7 @@ from nonebot.plugin import on_command
 from sqlmodel import select
 
 from .general import bind_steamid
+from ..core import get_bank
 from ..core.db.deps import SessionDep
 from ..core.db.models import Sign, CoinTransaction, TransactionType
 from ..core.db.models import User, Allowance
@@ -36,34 +38,49 @@ async def _(event: MessageEvent, session: SessionDep, args: Message = CommandArg
     else:
         amount = 20
 
+    # 计算 1% 税，至少为 1 硬币
+    tax = math.ceil(amount * 0.01)
+    amount_after_tax = amount - tax
+
     if cd.user1.coins < amount:
         return await give.send(f"余额不足 你有: {cd.user1.coins} 需要 {amount}", at_sender=True)
 
     cd.user1.coins -= amount
-    cd.user2.coins += amount
-    session.add(cd.user1)
-    session.add(cd.user2)
+    cd.user2.coins += amount_after_tax
+    bank = get_bank()
+    bank.coins += tax
+
+    session.add_all([cd.user1, cd.user2, bank])
 
     # 添加交易记录
-    session.add(CoinTransaction(
-        user_id=cd.user1.qid,
-        amount=-amount,
-        type=TransactionType.GIVE,
-        description=f"打赏给 {cd.user2.nickname}"
-    ))
-    session.add(CoinTransaction(
-        user_id=cd.user2.qid,
-        amount=amount,
-        type=TransactionType.GIVE,
-        description=f"收到来自 {cd.user1.nickname} 的打赏"
-    ))
+    session.add_all([
+        CoinTransaction(
+            user_id=cd.user1.qid,
+            amount=-amount,
+            type=TransactionType.GIVE,
+            description=f"打赏给 {cd.user2.nickname}（含税）"
+        ),
+        CoinTransaction(
+            user_id=cd.user2.qid,
+            amount=amount_after_tax,
+            type=TransactionType.GIVE,
+            description=f"收到来自 {cd.user1.nickname} 的打赏（税后）"
+        ),
+        CoinTransaction(
+            user_id="bank",
+            amount=tax,
+            type=TransactionType.GIVE,
+            description=f"打赏税收来自 {cd.user1.nickname}"
+        )
+    ])
 
     session.commit()
     session.refresh(cd.user1)
     session.refresh(cd.user2)
 
     return await give.send(
-        f"赠送给 {cd.user2.nickname} {amount} 硬币成功, 对方余额 {cd.user2.coins}(+{amount})\n"
+        f"赠送给 {cd.user2.nickname} {amount_after_tax} 硬币成功（原始 {amount}，税收 {tax}）\n"
+        f"对方余额 {cd.user2.coins}(+{amount_after_tax})\n"
         f"你的余额 {cd.user1.coins}(-{amount})",
         at_sender=True
     )
