@@ -9,6 +9,7 @@ from nonebot_plugin_apscheduler import scheduler
 from sqlmodel import Session, select
 
 from .. import axekz_config
+from ..core import get_bank
 from ..core.db import engine
 from ..core.db.models import Sign, User, Roll, TransactionType, CoinTransaction
 
@@ -17,14 +18,16 @@ async def daily_asset_tax():
     print("开始每日资产税收...")
 
     with Session(engine) as session:
-        users = session.exec(select(User)).all()
+        users = session.exec(select(User).where(User.qid != "bank")).all()
         tax_records = []
+        total_tax = 0
 
         for user in users:
             if user.coins < 1:
                 continue
 
             tax_amount = ceil(user.coins / 1000)
+            total_tax += tax_amount
 
             user.coins -= tax_amount
             tax_records.append(CoinTransaction(
@@ -35,10 +38,21 @@ async def daily_asset_tax():
             ))
             session.add(user)
 
-        if tax_records:
+        if total_tax > 0:
+            bank = get_bank()
+            bank.coins += total_tax
+            session.add(bank)
+
+            tax_records.append(CoinTransaction(
+                user_id="bank",
+                amount=total_tax,
+                type=TransactionType.TAX,
+                description=f"每日资产税收汇总收入，共 {total_tax} 硬币"
+            ))
+
             session.add_all(tax_records)
             session.commit()
-            print(f"已成功扣除资产税，处理 {len(tax_records)} 位用户")
+            print(f"已成功扣除资产税，处理 {len(tax_records) - 1} 位用户，税收共计 {total_tax}")
         else:
             print("无可扣税用户，无操作")
 
