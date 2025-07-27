@@ -196,7 +196,10 @@ async def _(event: MessageEvent, session: SessionDep):
 
     # Get the top 3 users with the most coins (with coins > 100)
     top_users = session.exec(
-        select(User).where(User.coins > 100).order_by(User.coins.desc()).limit(1)
+        select(User)
+        .where(User.qid != BANK_QID, User.coins >= 100)
+        .order_by(User.coins.desc())
+        .limit(1)
     ).all()
 
     if not top_users:
