@@ -58,19 +58,19 @@ async def _(event: MessageEvent, session: SessionDep, args: Message = CommandArg
             user_id=cd.user1.qid,
             amount=-amount,
             type=TransactionType.GIVE,
-            description=f"打赏给 {cd.user2.nickname}（含税）"
+            description=f"转账给 {cd.user2.nickname}（含税）"
         ),
         CoinTransaction(
             user_id=cd.user2.qid,
             amount=amount_after_tax,
             type=TransactionType.GIVE,
-            description=f"收到来自 {cd.user1.nickname} 的打赏（税后）"
+            description=f"收到来自 {cd.user1.nickname} 的转账（税后）"
         ),
         CoinTransaction(
             user_id="bank",
             amount=tax,
             type=TransactionType.GIVE,
-            description=f"打赏税收来自 {cd.user1.nickname}"
+            description=f"转账税收来自 {cd.user1.nickname}"
         )
     ])
 
