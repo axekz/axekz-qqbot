@@ -1,10 +1,13 @@
 from nonebot import logger
-from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment, Message, Bot, GroupMessageEvent
+from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment, Message, Bot, GroupMessageEvent, \
+    PrivateMessageEvent
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
 from nonebot.plugin import on_command
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
+import base64
+import time
 
 from . import BIND_PROMPT
 from ..core import get_bank
@@ -15,6 +18,8 @@ from ..core.utils.convertors import convert_steamid
 from ..core.utils.formatters import format_kzmode
 from ..core.utils.helpers import api_get
 
+BIND_SECRET = "ChangeThisSecret!"
+
 bind = on_command('绑定', priority=10, block=True)
 mode = on_command('mode')
 test = on_command('test')
@@ -23,9 +28,65 @@ info = on_command('info')
 rename = on_command('rename')
 special_title = on_command('title', aliases={'头衔'})
 transactions = on_command("transactions", aliases={"账单", "账单记录", "硬币记录", "coinlog"})
+bind_token = on_command("bind", priority=10)
 
 RENAME_COST = 20
 TITLE_COST = 100
+
+
+def decode_bind_token(token: str, secret: str) -> tuple[int, int]:
+    """解码游戏端生成的绑定令牌，返回 (steamid32, expiry_timestamp)"""
+    raw = base64.b64decode(token)
+    key = secret.encode()
+    key_len = len(key)
+    decrypted_bytes = bytes(raw[i] ^ key[i % key_len] for i in range(len(raw)))
+    steamid_str, expiry_str = decrypted_bytes.decode().split("|", 1)
+    return int(steamid_str), int(expiry_str)
+
+
+@bind_token.handle()
+async def handle_bind_token(bot: Bot, event: MessageEvent, session: SessionDep):
+    # 如果不是私聊，则提醒用户去私聊使用
+    if not isinstance(event, PrivateMessageEvent):
+        try:
+            await bot.delete_msg(message_id=event.message_id)
+        except Exception:
+            # 撤回失败时可忽略或者记录日志
+            pass
+
+    user_id = event.get_user_id()
+    # 取出参数
+    args = event.get_plaintext().strip().split(maxsplit=1)
+    if len(args) < 2:
+        return await bind_token.finish("请在 /bind 后提供绑定码，例如 /bind AbCdEfG...\n进入服务器输入 /bindqq 即可获取")
+
+    token_arg = args[1]
+    try:
+        steamid32, expiry = decode_bind_token(token_arg, BIND_SECRET)
+        if expiry < int(time.time()):
+            return await bind_token.finish("绑定令牌已过期，请在游戏中重新生成。")
+        steamid = str(steamid32)
+        steamid = convert_steamid(steamid, '64')
+    except Exception:
+        return await bind_token.finish("绑定码格式不正确，请确认后重新发送。")
+
+    # 查询昵称并保存用户信息
+    try:
+        playtime_data = await api_get("/players/playtime", {"steamid": steamid})
+        nickname = playtime_data.get("name", "Unknown") if playtime_data else "Unknown"
+    except Exception:
+        return await bind_token.finish("未能获取玩家在服务器的信息，请尝试断开与服务器的连接后再绑定")
+
+    user = User(qid=user_id, steamid=steamid, nickname=nickname)
+    try:
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+    except IntegrityError:
+        return await bind_token.finish("该 QQ 已绑定过，不需要重复绑定。")
+
+    reply = MessageSegment.reply(event.message_id)
+    await bind_token.send(reply + f"绑定成功\n{user}")
 
 
 @transactions.handle()
@@ -213,8 +274,8 @@ async def bind_steamid(event: MessageEvent, session: SessionDep):
     try:
         playtime_data = await api_get('/players/playtime', {'steamid': steamid})
         nickname = playtime_data.get('name', 'Unknown') if playtime_data else 'Unknown'
-    except Exception as e:
-        return await bind.finish(f"{repr(e)}未能获取玩家在服务器的信息(你进入过本服务器吗？)")
+    except Exception:
+        return await bind.finish(f"未能获取玩家在服务器的信息(你进入过本服务器吗？)")
 
     user = User(
         qid=user_id,
