@@ -158,7 +158,8 @@ async def _(event: GroupMessageEvent, session: SessionDep):
 
     await sign.send(
         f'签到成功，从 {giver.nickname} 身上薅了 {earned_coins} 硬币！\n'
-        f'当前余额：{user.coins} 对方剩余：{giver.coins}'
+        f'当前余额：{user.coins} 对方剩余：{giver.coins}',
+        at_sender=True
     )
 
 

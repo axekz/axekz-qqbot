@@ -92,7 +92,7 @@ async def auto_clean_ljpk_sessions():
 async def _(event: MessageEvent, args: Message = CommandArg()):
     cd = CommandData(event, args)
     if cd.error:
-        return await ljpb.send(cd.error)
+        return await ljpb.send(cd.error, at_sender=True)
 
     user = cd.user
 
@@ -122,25 +122,25 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         {created_datetime.strftime('%Y年%m月%d日 %H:%M')}
     """).strip()
 
-    await lj.finish(MessageSegment.reply(event.message_id) + content)
+    await lj.finish(MessageSegment.reply(event.message_id) + content, at_sender=True)
 
 
-@lj.handle()
-async def _(event: MessageEvent, session: SessionDep):
-    await lj.finish()
-    user_id = event.get_user_id()
-    user: User | None = session.get(User, user_id)
-    if not user:
-        user = await bind_steamid(event, session)
-
-    data = await api_get('/casual/lj', {'mode': user.mode})
-    content = ""
-    for item in data:
-        content += f"跳出了 {item['distance']} 空速: {item['max_val']} 地速: {item['pre']} {item['strafes']}次加速  {item['sync']}同步率"
-
-    await lj.send(MessageSegment.reply(event.message_id) + content)
-    file_url = f"https://r2.axekz.com/sound/silk/quake/{data[0]['color']}.silk"
-    await lj.send(MessageSegment.record(file_url))
+# @lj.handle()
+# async def _(event: MessageEvent, session: SessionDep):
+#     await lj.finish()
+#     user_id = event.get_user_id()
+#     user: User | None = session.get(User, user_id)
+#     if not user:
+#         user = await bind_steamid(event, session)
+#
+#     data = await api_get('/casual/lj', {'mode': user.mode})
+#     content = ""
+#     for item in data:
+#         content += f"跳出了 {item['distance']} 空速: {item['max_val']} 地速: {item['pre']} {item['strafes']}次加速  {item['sync']}同步率"
+#
+#     await lj.send(MessageSegment.reply(event.message_id) + content)
+#     file_url = f"https://r2.axekz.com/sound/silk/quake/{data[0]['color']}.silk"
+#     await lj.send(MessageSegment.record(file_url))
 
 
 @ljpk.handle()
@@ -152,7 +152,7 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
     user_id = event.get_user_id()
     cd = CommandData(event, args)
     if cd.error:
-        return await ljpk.send(reply + cd.error)
+        return await ljpk.send(reply + cd.error, at_sender=True)
 
     # ljpk stats
     if cd.args and cd.args[0] == 'stats':
@@ -165,16 +165,16 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
                 平均距离: {stats.avg_distance}
                 总场次:　 {stats.total_matches}
             """).strip()
-        return await ljpk.send(reply + content)
+        return await ljpk.send(reply + content, at_sender=True)
 
     # Check if the player already has an active session
     for session in ljpk_sessions:
         if session.user1.qid == cd.user1.qid and session.group_id == event.group_id:
-            return await ljpk.send(reply + "你已经开启了一场决斗，请等待决斗结束后再发起新的决斗。")
+            return await ljpk.send(reply + "你已经开启了一场决斗，请等待决斗结束后再发起新的决斗。", at_sender=True)
 
     if cd.args:
         if cd.args[0] == 'kick':
-            return await ljpk.finish("ljpk kick功能已关闭")
+            return await ljpk.finish("ljpk kick功能已关闭", at_sender=True)
             # bet_coins = 0
         elif cd.args[0] == 'mute':
             bet_coins = -1
@@ -184,9 +184,9 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
             try:
                 bet_coins = int(cd.args[0])
                 if bet_coins < 1:
-                    return await ljpk.send(reply + "投入不能小于1")
+                    return await ljpk.send(reply + "投入不能小于1", at_sender=True)
             except ValueError:
-                return await ljpk.send(reply + "投入输入格式不正确")
+                return await ljpk.send(reply + "投入输入格式不正确", at_sender=True)
     else:
         bet_coins = 20
 
@@ -248,7 +248,7 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep):
                 user1, user2 = pk_session.get_users(session)
 
                 if not user1 or not user2:
-                    return await accept_game.send("玩家数据无效，比赛无法开始")
+                    return await accept_game.send("玩家数据无效，比赛无法开始", at_sender=True)
 
                 if user1.coins < pk_session.bet_coins:
                     return await accept_game.send(
@@ -327,7 +327,7 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep):
                             "失败者特效在你身上是常驻皮肤吧？"
                         ]
                         taunt = random.choice(taunt_messages)  # 省略 taunt_messages，保留原本内容
-                        await accept_game.send(MessageSegment.at(int(loser.qid)) + " " + taunt)
+                        await accept_game.send(MessageSegment.at(int(loser.qid)) + " " + taunt, at_sender=True)
                         await bot.set_group_ban(group_id=event.group_id, user_id=int(loser.qid), duration=10 * 60)
                     return None
 

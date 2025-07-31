@@ -21,7 +21,7 @@ async def _(event: MessageEvent, session: SessionDep, arg: Message = CommandArg(
     user_id = event.get_user_id()
     user = session.get(User, user_id)
     if not user:
-        return await mybets.finish("用户不存在，请先绑定SteamID")
+        return await mybets.finish("用户不存在，请先绑定SteamID", at_sender=True)
 
     now = datetime.now()
     # 优先查找当前进行中的赛事
@@ -34,7 +34,7 @@ async def _(event: MessageEvent, session: SessionDep, arg: Message = CommandArg(
         # 如果没有正在进行的赛事，退而求其次找最新一场（已结束）赛事
         latest_event = session.exec(select(BetEvent).order_by(BetEvent.start_time.desc())).first()
         if not latest_event:
-            return await mybets.finish("尚未创建任何赛事")
+            return await mybets.finish("尚未创建任何赛事", at_sender=True)
         event_id = latest_event.id
 
     stmt = (
@@ -46,7 +46,7 @@ async def _(event: MessageEvent, session: SessionDep, arg: Message = CommandArg(
 
     results = session.exec(stmt).all()
     if not results:
-        return await mybets.finish("你在该赛事中尚未投注任何选项")
+        return await mybets.finish("你在该赛事中尚未投注任何选项", at_sender=True)
 
     bet_event = session.get(BetEvent, event_id)
     content = f"赛事: {bet_event.name}（ID: {bet_event.id}）的投注记录：\n"
@@ -57,7 +57,7 @@ async def _(event: MessageEvent, session: SessionDep, arg: Message = CommandArg(
             f"{'-------------------------'}\n"
         )
 
-    await mybets.finish(content)
+    await mybets.finish(content, at_sender=True)
 
 
 @signup.handle()
@@ -65,7 +65,7 @@ async def _(event: MessageEvent, session: SessionDep):
     user_id = event.get_user_id()
     user = session.get(User, user_id)
     if not user:
-        return await signup.finish("用户不存在，请先绑定 SteamID")
+        return await signup.finish("用户不存在，请先绑定 SteamID", at_sender=True)
 
     now = datetime.now()
     events = session.exec(
@@ -73,9 +73,9 @@ async def _(event: MessageEvent, session: SessionDep):
     ).all()
 
     if not events:
-        return await signup.finish("当前没有正在进行的赛事")
+        return await signup.finish("当前没有正在进行的赛事", at_sender=True)
     if len(events) > 1:
-        return await signup.finish("检测到多个正在进行的赛事，请联系管理员")
+        return await signup.finish("检测到多个正在进行的赛事，请联系管理员", at_sender=True)
 
     current_event = events[0]
 
@@ -92,8 +92,8 @@ async def _(event: MessageEvent, session: SessionDep):
             existing.updated_at = datetime.now()
             session.add(existing)
             session.commit()
-            return await signup.finish("重新激活报名成功！")
-        return await signup.finish("你已经报名过了！")
+            return await signup.finish("重新激活报名成功！", at_sender=True)
+        return await signup.finish("你已经报名过了！", at_sender=True)
 
     # Assign option_id as 1-based incremental within this event
     max_option_id = session.exec(
