@@ -17,7 +17,7 @@ from ..core.utils.command_helper import CommandData
 sign = on_command('签到', aliases={'qd', 'sign'})
 allowance = on_command('低保', aliases={'db'})
 give = on_command('give', aliases={'gv', '赠送'})
-daily_task = on_command('每日任务', aliases={'daily_task', 'mrrw'})
+# daily_task = on_command('每日任务', aliases={'daily_task', 'mrrw'})
 
 
 @give.handle()
