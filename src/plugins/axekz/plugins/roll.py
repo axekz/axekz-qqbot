@@ -3,22 +3,22 @@ from datetime import datetime, timedelta
 from math import ceil
 from textwrap import dedent
 
-from nonebot import get_bot, on_command
-from nonebot.adapters.onebot.v11 import Bot, MessageSegment, MessageEvent
+from nonebot import get_bot, logger
+from nonebot.adapters.onebot.v11 import Bot, MessageSegment
 from nonebot_plugin_apscheduler import scheduler
 from sqlmodel import Session, select
 
 from .. import axekz_config
-from ..core import get_bank
+from ..core import get_bank, BANK_QID
 from ..core.db import engine
 from ..core.db.models import Sign, User, Roll, TransactionType, CoinTransaction
 
 
 async def daily_asset_tax():
-    print("开始每日资产税收...")
+    logger.info("开始每日资产税收...")
 
     with Session(engine) as session:
-        users = session.exec(select(User).where(User.qid != "bank")).all()
+        users = session.exec(select(User).where(User.qid != BANK_QID)).all()
         tax_records = []
         total_tax = 0
 
@@ -52,9 +52,9 @@ async def daily_asset_tax():
 
             session.add_all(tax_records)
             session.commit()
-            print(f"已成功扣除资产税，处理 {len(tax_records) - 1} 位用户，税收共计 {total_tax}")
+            logger.info(f"已成功扣除资产税，处理 {len(tax_records) - 1} 位用户，税收共计 {total_tax}")
         else:
-            print("无可扣税用户，无操作")
+            logger.info("无可扣税用户，无操作")
 
 
 @scheduler.scheduled_job("cron", hour="1", minute="0", id="daily_tax")
