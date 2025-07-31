@@ -5,10 +5,11 @@ from datetime import datetime
 from textwrap import dedent
 from typing import Optional
 
-from nonebot import on_message
+from nonebot import on_message, get_bot
 from nonebot.adapters.onebot.v11 import MessageSegment, MessageEvent, Message, Bot, GroupMessageEvent
 from nonebot.params import CommandArg
 from nonebot.plugin import on_command
+from nonebot_plugin_apscheduler import scheduler
 from sqlmodel import Session
 
 from .general import bind_steamid
@@ -32,6 +33,7 @@ class LJPKSession:
         self.bet_coins: int = bet_coins
         self.group_id = group_id
         self.created_at: datetime = datetime.now()
+        self.bot_message_id: Optional[int] = None  # 新增：记录机器人发送的消息 ID
 
     def get_users(self, session: Session) -> tuple[type[User] | None, type[User] | None]:
         user1 = session.get(User, self.qid1)
@@ -45,15 +47,8 @@ class LJPKSession:
 ljpk_sessions: list[LJPKSession] = []
 
 
-def clean_expire_session(expiration_minutes: int = 2):
-    """
-    Remove expired LJPK sessions from the ljpk_sessions list.
-
-    Args:
-        expiration_minutes (int): The time in minutes after which a session should be considered expired.
-    """
-    global ljpk_sessions  # Declare ljpk_sessions as global
-
+async def clean_expire_session(bot: Bot, expiration_minutes: int = 2):
+    global ljpk_sessions
     current_time = datetime.now()
     non_expired_sessions = []
 
@@ -61,9 +56,36 @@ def clean_expire_session(expiration_minutes: int = 2):
         time_diff = current_time - session.created_at
         if time_diff.total_seconds() < expiration_minutes * 60:
             non_expired_sessions.append(session)
+        else:
+            if session.bot_message_id:
+                try:
+                    await bot.delete_msg(message_id=session.bot_message_id)
+                except:
+                    pass
 
-    # Update the ljpk_sessions list to only include non-expired sessions
     ljpk_sessions = non_expired_sessions
+
+
+@scheduler.scheduled_job("interval", seconds=5)
+async def auto_clean_ljpk_sessions():
+    if not ljpk_sessions:
+        return  # 没有 Session，直接返回避免浪费资源
+
+    bot = get_bot()
+    current_time = datetime.now()
+
+    new_sessions = []
+    for session in ljpk_sessions:
+        if (current_time - session.created_at).total_seconds() < 120:
+            new_sessions.append(session)
+        else:
+            if session.bot_message_id:
+                try:
+                    await bot.delete_msg(message_id=session.bot_message_id)
+                except Exception:
+                    pass  # 可能已被手动撤回或无权限
+
+    ljpk_sessions[:] = new_sessions
 
 
 @ljpb.handle()
@@ -122,9 +144,10 @@ async def _(event: MessageEvent, session: SessionDep):
 
 
 @ljpk.handle()
-async def _(event: GroupMessageEvent, args: Message = CommandArg()):
+async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
     # 判定一个人同时只能开一次决斗
-    clean_expire_session()
+    await clean_expire_session(bot)
+
     reply = MessageSegment.reply(event.message_id)
     user_id = event.get_user_id()
     cd = CommandData(event, args)
@@ -169,7 +192,6 @@ async def _(event: GroupMessageEvent, args: Message = CommandArg()):
 
     pk_session = LJPKSession(initializer_qid=cd.user1.qid, opponent_qid=cd.user2.qid if cd.user2 else None,
                              bet_coins=bet_coins, group_id=event.group_id)
-    ljpk_sessions.append(pk_session)
 
     bet_comments = bet_coins
     if bet_coins == 0:
@@ -177,13 +199,17 @@ async def _(event: GroupMessageEvent, args: Message = CommandArg()):
     elif bet_coins == -1:
         bet_comments = '败者被禁言10分钟'
 
-    return await ljpk.finish(dedent(f"""
+    msg = await ljpk.send(dedent(f"""
         玩家 {user_id} 开启了一场LJPK
         赌注: {bet_comments}
         对手: {cd.user2.nickname + ' ' + str(cd.user2.qid) if cd.user2 else '未指定'}
         回复此条信息即可开始PK
         自己回复这条消息即取消
     """).strip())
+
+    pk_session.bot_message_id = msg.message_id
+    ljpk_sessions.append(pk_session)
+    return None
 
 
 @accept_game.handle()
@@ -206,10 +232,15 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep):
             if int(pk_session.qid1) == initializer_id and pk_session.group_id == event.group_id:
                 if int(pk_session.qid1) == int(user_id):
                     ljpk_sessions.remove(pk_session)
-                    return await accept_game.send('已取消这场比赛')
+                    if pk_session.bot_message_id:
+                        try:
+                            await bot.delete_msg(message_id=pk_session.bot_message_id)
+                        except:
+                            pass
+                    return await accept_game.send('已取消这场比赛', at_sender=True)
 
                 if pk_session.qid2 is not None and int(pk_session.qid2) != int(user_id):
-                    return await accept_game.send('该LJPK指定的对手不是你')
+                    return await accept_game.send('别人跟你PK了吗你就接受', at_sender=True)
 
                 if pk_session.qid2 is None:
                     pk_session.set_opponent(user_id)
