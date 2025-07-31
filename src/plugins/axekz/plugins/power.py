@@ -1,5 +1,5 @@
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageSegment, Message, Bot
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageSegment, Message, Bot, MessageEvent
 from nonebot.params import CommandArg
 
 from src.plugins.axekz.core import get_bank
@@ -102,20 +102,21 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep, args: Messa
 
 
 @admin.handle()
-async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep, args: Message = CommandArg()):
+async def _(bot: Bot, event: MessageEvent, session: SessionDep, args: Message = CommandArg()):
     # bot_info = await bot.get_group_member_info(user_id=int(bot.self_id), group_id=event.group_id, no_cache=True)
     # if bot_info['role'] != 'owner':
     #     return await admin.send('机器人在本群不是群主，无法购买管理员')
+    group_id = 188099455
 
     cd = CommandData(event, args)
     if cd.error:
         return await mute.send(cd.error, at_sender=True)
     if cd.user1.qid == '986668919':
-        user_info = await bot.get_group_member_info(user_id=int(cd.user1.qid), group_id=event.group_id, no_cache=True)
+        user_info = await bot.get_group_member_info(user_id=int(cd.user1.qid), group_id=group_id, no_cache=True)
         if user_info['role'] != 'admin':
-            await bot.set_group_admin(group_id=event.group_id, user_id=int(cd.user1.qid), enable=True)
+            await bot.set_group_admin(group_id=group_id, user_id=int(cd.user1.qid), enable=True)
         else:
-            await bot.set_group_admin(group_id=event.group_id, user_id=int(cd.user1.qid), enable=False)
+            await bot.set_group_admin(group_id=group_id, user_id=int(cd.user1.qid), enable=False)
     return None
     # 判定余额是否充足
     # if cd.user1.coins < ADMIN_COST:
