@@ -5,7 +5,7 @@ from datetime import datetime
 from textwrap import dedent
 from typing import Optional
 
-from nonebot import on_message, get_bot
+from nonebot import on_message, get_bot, logger
 from nonebot.adapters.onebot.v11 import MessageSegment, MessageEvent, Message, Bot, GroupMessageEvent
 from nonebot.params import CommandArg
 from nonebot.plugin import on_command
@@ -49,43 +49,29 @@ ljpk_sessions: list[LJPKSession] = []
 
 async def clean_expire_session(bot: Bot, expiration_minutes: int = 2):
     global ljpk_sessions
-    current_time = datetime.now()
-    non_expired_sessions = []
-
-    for session in ljpk_sessions:
-        time_diff = current_time - session.created_at
-        if time_diff.total_seconds() < expiration_minutes * 60:
-            non_expired_sessions.append(session)
-        else:
-            if session.bot_message_id:
-                try:
-                    await bot.delete_msg(message_id=session.bot_message_id)
-                except:
-                    pass
-
-    ljpk_sessions = non_expired_sessions
-
-
-@scheduler.scheduled_job("interval", seconds=5)
-async def auto_clean_ljpk_sessions():
     if not ljpk_sessions:
-        return  # 没有 Session，直接返回避免浪费资源
+        return
 
-    bot = get_bot()
     current_time = datetime.now()
-
     new_sessions = []
+
     for session in ljpk_sessions:
-        if (current_time - session.created_at).total_seconds() < 120:
+        if (current_time - session.created_at).total_seconds() < expiration_minutes * 60:
             new_sessions.append(session)
         else:
             if session.bot_message_id:
                 try:
                     await bot.delete_msg(message_id=session.bot_message_id)
                 except Exception:
-                    pass  # 可能已被手动撤回或无权限
+                    pass  # 无权限或消息已撤回
 
     ljpk_sessions[:] = new_sessions
+
+
+@scheduler.scheduled_job("interval", seconds=5)
+async def auto_clean_ljpk_sessions():
+    bot = get_bot()
+    await clean_expire_session(bot)
 
 
 @ljpb.handle()
@@ -104,6 +90,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         'offset': 0
     }
     data = await api_get("/gokz/jumpstats", params)
+    if not data:
+        return await ljpb.send("未查找到 LJ PB 数据", at_sender=True)
     data = data[0]
 
     created_datetime = datetime.strptime(data['Created'], '%Y-%m-%dT%H:%M:%S')
@@ -206,8 +194,7 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
         回复此条信息即可开始PK
         自己回复这条消息即取消
     """).strip())
-
-    pk_session.bot_message_id = msg.message_id
+    pk_session.bot_message_id = msg['message_id']
     ljpk_sessions.append(pk_session)
     return None
 
@@ -216,7 +203,7 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
 async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep):
     if event.reply and event.reply.sender.user_id == int(bot.self_id):
         user_id = event.get_user_id()
-        clean_expire_session()
+        await clean_expire_session(bot)
         try:
             original_message = event.reply.message.extract_plain_text()
         except TypeError:
@@ -387,5 +374,5 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep):
                 ljpk_sessions.remove(pk_session)
                 return await accept_game.send(content, at_sender=True)
 
-        return await accept_game.send("未找到该LJPK对局，或已被其他玩家接受，或已超过两分钟")
+        return await accept_game.send("未找到该LJPK对局，或已被其他玩家接受，或已超过两分钟", at_sender=True)
     return None
