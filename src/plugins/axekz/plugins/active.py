@@ -15,9 +15,17 @@ from ..core.db.models import User, Allowance
 from ..core.utils.command_helper import CommandData
 
 sign = on_command('签到', aliases={'qd', 'sign'})
-allowance = on_command('低保', aliases={'db'})
 give = on_command('give', aliases={'gv', '赠送'})
+bank = on_command("bank", aliases={"银行", "余额", "bank_balance"})
+
+# allowance = on_command('低保', aliases={'db'})
 # daily_task = on_command('每日任务', aliases={'daily_task', 'mrrw'})
+
+
+@bank.handle()
+async def _(event: MessageEvent, session: SessionDep):
+    bank_user = get_bank()
+    await bank.finish(f"银行当前拥有 {bank_user.coins} 枚硬币")
 
 
 @give.handle()
@@ -124,8 +132,8 @@ async def _(event: GroupMessageEvent, session: SessionDep):
     earned_coins = max(1, earned_coins)
 
     # 秘密群组双倍奖励
-    if event.group_id == 1044299554:
-        earned_coins *= 2
+    # if event.group_id == 1044299554:
+    #     earned_coins *= 2
 
     # 硬币转移
     giver.coins -= earned_coins
@@ -241,87 +249,3 @@ async def _(event: GroupMessageEvent, session: SessionDep):
 #     session.refresh(user)
 #
 #     await allowance.send(f'低保领取成功, 获得 {earned_coins} 硬币\n当前余额：{user.coins} 今天还可以领取 {len(allowance_count_today) + 1}/3 次\n来自用户: {giver.nickname} {giver.coins} (-{earned_coins})')
-
-    
-# @daily_task.handle()
-# async def _(event: MessageEvent, session: SessionDep):
-#     await daily_task.finish('该功能暂不可用')
-#     user_id = event.user_id
-#     user: User | None = session.get(User, user_id)
-#     if not user:
-#         user = await bind_steamid(event, session)
-#     # Check if the user already has tasks
-#     query = select(DailyTask).where(DailyTask.user_id == user_id)
-#     result = session.execute(query)
-#     tasks: list[DailyTask] | None = result.scalars().all()
-#
-#     if not tasks:
-#         # No tasks found, create a new task for the user
-#         daily_online_task = DailyTask(
-#             user_id=str(user_id),
-#             task_type=TaskTypeEnum.DAILY_ONLINE,  # You can set the task type here
-#             bonus=20
-#         )
-#
-#         daily_map_pb_finish = DailyTask(
-#             user_id=str(user_id),
-#             task_type=TaskTypeEnum.DAILY_MAP_PB,
-#             mode=user.mode,
-#             bonus=50
-#         )
-#
-#         tasks.append(daily_online_task)
-#         tasks.append(daily_map_pb_finish)
-#         session.add_all(tasks)
-#         session.commit()
-#         session.refresh(daily_online_task)
-#         session.refresh(daily_map_pb_finish)
-#         return await daily_task.send('每日任务领取成功')
-#
-#     else:
-#         unfinished_tasks = [task for task in tasks if not task.finished_at]
-#         if not unfinished_tasks:
-#             return await daily_task.send("你已完成所有每日任务，请明天再来领取新的任务。")
-#
-#         for task in unfinished_tasks:
-#             if task.task_type == TaskTypeEnum.DAILY_ONLINE:
-#                 online_data = await api_get('/players/playtime', params={'steamid': user.steamid})
-#                 if online_data and 'lastseen' in online_data:
-#                     last_seen_str = online_data['lastseen']
-#                     last_seen_datetime = datetime.fromisoformat(last_seen_str)
-#
-#                     # Check if the date part of lastseen is today's date
-#                     if last_seen_datetime.date() == datetime.today().date():
-#                         # Mark the task as completed
-#                         task.finished_at = datetime.now()
-#                         user.coins += task.bonus
-#                         session.add(task)
-#                         session.add(user)
-#                         session.commit()
-#                         session.refresh(user)
-#
-#                         return await daily_task.send(f'每日登陆任务已完成, 获得 {task.bonus}, 余额 {user.coins}')
-#
-#             elif task.task_type == TaskTypeEnum.DAILY_MAP_PB:
-#                 player_recent_data = await fetch_personal_recent(user.steamid, mode=task.mode)
-#                 print(player_recent_data)
-#                 if player_recent_data and player_recent_data['server_id'] == 1683:
-#                     player_recent_datetime = datetime.fromisoformat(player_recent_data['created_on'])
-#
-#                     if player_recent_datetime.date() == datetime.today().date():
-#                         # Mark the task as completed
-#                         task.finished_at = datetime.now()
-#                         user.coins += task.bonus
-#                         session.add(task)
-#                         session.add(user)
-#                         session.commit()
-#                         session.refresh(user)
-#                         return await daily_task.send(f'每日地图完成任务已完成, 获得 {task.bonus}, 余额 {user.coins}')
-#
-#         # Send a message with the status of unfinished tasks
-#
-#         unfinished_task_descriptions = "\n".join(
-#             [f"任务: {task.task_type} 奖励 {task.bonus} 硬币 - 未完成" for task in unfinished_tasks])
-#
-#         await daily_task.send(f"您有以下未完成的任务:\n{unfinished_task_descriptions}")
-

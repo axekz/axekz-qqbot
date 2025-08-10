@@ -5,7 +5,7 @@ from datetime import datetime
 from textwrap import dedent
 from typing import Optional
 
-from nonebot import on_message, get_bot, logger
+from nonebot import on_message, get_bot, logger, get_bots
 from nonebot.adapters.onebot.v11 import MessageSegment, MessageEvent, Message, Bot, GroupMessageEvent
 from nonebot.params import CommandArg
 from nonebot.plugin import on_command
@@ -69,8 +69,11 @@ async def clean_expire_session(bot: Bot, expiration_minutes: int = 2):
 
 
 @scheduler.scheduled_job("interval", seconds=5)
-async def auto_clean_ljpk_sessions():
-    bot = get_bot()
+async def auto_clean_ljpk_sessions(bot: Bot):
+    bots = get_bots()
+    if not bots:
+        return  # No bot connected yet
+    bot = next(iter(bots.values()))
     await clean_expire_session(bot)
 
 
@@ -318,8 +321,7 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep):
                         await bot.set_group_ban(group_id=event.group_id, user_id=int(loser.qid), duration=10 * 60)
                     return None
 
-                # 金币对战场
-                tax = math.ceil(pk_session.bet_coins * 0.05)
+                tax = math.ceil(pk_session.bet_coins * 0.20)
                 winner_gain = pk_session.bet_coins - tax
                 winner.coins += winner_gain
                 loser.coins -= pk_session.bet_coins

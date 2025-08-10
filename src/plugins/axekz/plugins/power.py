@@ -1,6 +1,7 @@
 from nonebot import on_command
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageSegment, Message, Bot, MessageEvent
 from nonebot.params import CommandArg
+from nonebot.permission import SUPERUSER
 
 from src.plugins.axekz.core import get_bank
 from src.plugins.axekz.core.db.deps import SessionDep
@@ -9,7 +10,7 @@ from src.plugins.axekz.core.utils.command_helper import CommandData
 mute = on_command('mute', aliases={'禁言'})
 kick = on_command('kick', aliases={'踢出'})
 admin = on_command('admin')
-group_rename = on_command('group_rename', aliases={'群名'})
+group_rename = on_command('group_rename', aliases={'群名'}, permission=SUPERUSER)
 
 ADMIN_COST = 1500
 KICK_COST = 1000
@@ -95,10 +96,10 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep, args: Messa
     await mute.finish(f'禁言成功，花费 {cost}, 剩余 {cd.user1.coins}', at_sender=True)
 
 
-# @group_rename.handle()
-# async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-#     group_name = args.extract_plain_text().strip()
-#     await bot.set_group_name(group_id=event.group_id, group_name=group_name)
+@group_rename.handle()
+async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
+    group_name = args.extract_plain_text().strip()
+    await bot.set_group_name(group_id=event.group_id, group_name=group_name)
 
 
 @admin.handle()

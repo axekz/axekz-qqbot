@@ -11,5 +11,5 @@ BIND_PROMPT = dedent("""
     
         【方式二：游戏内生成绑定码】
         1. 在游戏中输入指令：!bindqq
-        2. 将返回的绑定码私聊发送给机器人：/bind ABCDEFG
+        2. 将返回的绑定码在群聊中发送给机器人：/bind ABCDEFG
     """)
