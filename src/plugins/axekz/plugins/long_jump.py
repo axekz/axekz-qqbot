@@ -68,13 +68,13 @@ async def clean_expire_session(bot: Bot, expiration_minutes: int = 2):
     ljpk_sessions[:] = new_sessions
 
 
-@scheduler.scheduled_job("interval", seconds=5)
-async def auto_clean_ljpk_sessions(bot: Bot):
-    bots = get_bots()
-    if not bots:
-        return  # No bot connected yet
-    bot = next(iter(bots.values()))
-    await clean_expire_session(bot)
+# @scheduler.scheduled_job("interval", seconds=5)
+# async def auto_clean_ljpk_sessions(bot: Bot):
+#     bots = get_bots()
+#     if not bots:
+#         return  # No bot connected yet
+#     bot = next(iter(bots.values()))
+#     await clean_expire_session(bot)
 
 
 @ljpb.handle()
@@ -188,7 +188,7 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
     if bet_coins == 0:
         bet_comments = '败者被踢出群'
     elif bet_coins == -1:
-        bet_comments = '败者被禁言10分钟'
+        bet_comments = '败者被禁言1天'
 
     msg = await ljpk.send(dedent(f"""
         玩家 {user_id} 开启了一场LJPK
@@ -318,7 +318,7 @@ async def _(bot: Bot, event: GroupMessageEvent, session: SessionDep):
                         ]
                         taunt = random.choice(taunt_messages)  # 省略 taunt_messages，保留原本内容
                         await accept_game.send(MessageSegment.at(int(loser.qid)) + " " + taunt, at_sender=True)
-                        await bot.set_group_ban(group_id=event.group_id, user_id=int(loser.qid), duration=10 * 60)
+                        await bot.set_group_ban(group_id=event.group_id, user_id=int(loser.qid), duration=24 * 60 * 60)
                     return None
 
                 tax = math.ceil(pk_session.bet_coins * 0.20)

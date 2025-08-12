@@ -33,7 +33,7 @@ async def _(session: SessionDep, args: Message = CommandArg()):
 
     total_coins_statement = select(func.sum(User.coins))
     total_coins = session.exec(total_coins_statement).one_or_none()
-    total_coins = float(total_coins) if isinstance(total_coins, Decimal) else total_coins
+    total_coins = int(total_coins)
 
     if results:
         msg = f"╔═══硬币排行榜(总计: {total_coins:,})═══╗\n"
